@@ -24,35 +24,25 @@ case "${1:-help}" in
       echo "Noch keine Solutions. Anlegen: opencode \"neue Solution my-app\""
     fi
     ;;
-  new)
+  new|scaffold)
     shift
     SLUG="${1:-}"
-    if [[ -z "$SLUG" ]]; then
-      echo "Usage: clever new <slug> [beschreibung]"
-      exit 1
-    fi
-
-    # Recursion-Schutz: nicht von innerhalb opencode 'clever new' erneut aufrufen
-    if [[ -n "${OPENCODE_SESSION_ID:-}${OPENCODE_AGENT:-}" ]]; then
-      echo "✗ Du bist bereits in einer opencode-Session."
-      echo "  Bitte Slash-Command nutzen: /new-solution $*"
-      exit 1
-    fi
-
+    DESC="${2:-Clever Solution}"
+    [[ -z "$SLUG" ]] && { echo "Usage: clever new <slug> [\"description\"]"; exit 1; }
     bash "$CLEVER_HOME/scripts/check-slug.sh" "$SLUG" || exit 1
+    bash "$CLEVER_HOME/scripts/scaffold.sh" "$SLUG" "$DESC"
+    ;;
 
-    if ! command -v opencode >/dev/null 2>&1; then
-      echo "✗ opencode nicht installiert. Installation:"
-      echo "  curl -fsSL https://opencode.ai/install | bash"
-      exit 1
-    fi
-
-    # opencode mit korrektem 'run' Subkommando und expliziter Agent-Auswahl
-    DESC="${*:2}"
-    PROMPT="Erstelle eine neue Clever Solution namens '$SLUG'"
-    [[ -n "$DESC" ]] && PROMPT="$PROMPT für: $DESC"
-    PROMPT="$PROMPT. Folge strikt dem clever-solution Agent und den Guides in ~/.clever/guides/."
-    exec opencode run --agent clever-solution "$PROMPT"
+  extend)
+    shift
+    SLUG="${1:-}"; shift || true
+    PROMPT="$*"
+    [[ -z "$SLUG" || -z "$PROMPT" ]] && { echo 'Usage: clever extend <slug> "prompt..."'; exit 1; }
+    SOLDIR="$CLEVER_HOME/solutions/$SLUG"
+    [[ ! -d "$SOLDIR" ]] && { echo "✗ Solution '$SLUG' existiert nicht"; exit 1; }
+    command -v opencode >/dev/null || { echo "✗ opencode fehlt"; exit 1; }
+    cd "$SOLDIR"
+    exec opencode run --agent clever-solution "Aktuelle Solution: $SLUG (CWD: $SOLDIR). Aufgabe: $PROMPT"
     ;;
 
   deploy)
@@ -94,24 +84,29 @@ case "${1:-help}" in
 clever - Clever Solution CLI
 
 USAGE:
-  clever auth                    Keycloak Admin Login (einmalig pro 5 min)
-  clever check <slug>            Prüfe ob Slug/Subdomain verfügbar
-  clever new <name>              Erstelle Solution (ruft opencode)
-  clever invite <name> <email>   User für Solution freischalten
-  clever list                    Alle eigenen Solutions
-  clever deploy <name>           Solution deployen
-  clever update                  Guides + Scripts aktualisieren
+  clever auth                       Keycloak Admin Login (Browser)
+  clever check <slug>               Slug/Subdomain verfügbar?
+  clever new <slug> ["desc"]        Solution scaffolden (deterministisch, kein LLM)
+  clever extend <slug> "prompt"     Solution mit opencode erweitern
+  clever invite <slug> <email>      User freischalten
+  clever list                       Eigene Solutions
+  clever deploy <slug>              Production Deploy
+  clever update                     Toolchain aktualisieren
 
-ERSTE SCHRITTE (Mac, von 0):
-  1. brew install --cask docker          (falls nicht da)
-  2. curl -fsSL https://opencode.ai/install | bash
-  3. curl -fsSL https://code.clevercompany.ai/install | bash
-  4. clever auth
-  5. clever new my-first-solution
+ERSTE SCHRITTE:
+  1. curl -fsSL https://opencode.ai/install | bash
+  2. curl -fsSL https://code.clevercompany.ai/install | bash
+  3. clever auth
+  4. clever new mein-app
+  5. cd ~/.clever/solutions/mein-app && make up
+  6. open http://localhost:7100
 
-DOKUMENTATION:
-  ~/.clever/guides/                # alle Guides
-  https://code.clevercompany.ai    # online
+ERWEITERN:
+  clever extend mein-app "füge Modell Project mit name, description hinzu"
+
+DOKU:
+  ~/.clever/guides/                 # Brand, Architektur, Conventions
+  https://code.clevercompany.ai     # online
 EOF
     ;;
   *)

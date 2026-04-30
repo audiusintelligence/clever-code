@@ -63,6 +63,7 @@ fetch "command/invite.md"             "$OPENCODE_DIR/command/invite.md"
 fetch "scripts/clever"                "$CLEVER_HOME/scripts/clever"
 fetch "scripts/keycloak-client.sh"    "$CLEVER_HOME/scripts/keycloak-client.sh"
 fetch "scripts/check-slug.sh"         "$CLEVER_HOME/scripts/check-slug.sh"
+fetch "scripts/scaffold.sh"           "$CLEVER_HOME/scripts/scaffold.sh"
 
 chmod +x "$CLEVER_HOME/scripts/"*
 ok "alle Files installiert"

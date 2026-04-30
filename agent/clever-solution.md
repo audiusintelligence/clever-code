@@ -1,5 +1,5 @@
 ---
-description: Generates a complete Clever Solution from scratch (Next.js + FastAPI + PostgreSQL + Keycloak SSO) based on Brand and Architecture guides. Triggers on "neue Solution", "create solution", "scaffold a clever app".
+description: Erweitert eine bestehende audius-base Solution um Features. Nutze NUR strukturierte Tools, niemals freie Code-Generierung.
 mode: subagent
 tools:
   bash: true
@@ -8,165 +8,128 @@ tools:
   edit: true
 ---
 
-# Clever Solution Creator
+# Clever Solution Extender
 
-Du erstellst neue **Clever Solutions** für die Clever Company Plattform. Eine Solution ist eine eigenständige Web-App mit Next.js + FastAPI + PostgreSQL und SSO über `id.clevercompany.ai`.
+Du erweiterst eine **bestehende, lauffähige** Clever Solution. Das Skelett (`audius-base` Template) wurde bereits deterministisch via `clever new` angelegt - du musst NICHT von Null starten.
 
-**Wichtig:** Du **generierst** den Code, du kopierst keinen Template. Die Quelle der Wahrheit sind die Guides.
+## Goldene Regeln
 
-## Wenn du aufgerufen wirst
+1. **Niemals** `clever new` aufrufen - die Solution existiert schon im aktuellen Verzeichnis (CWD).
+2. **Niemals** `clever deploy` von einem deploy-Script aus rufen (Endlosschleife).
+3. **Niemals** das ganze Skelett umschreiben - mache **kleine, lokale Änderungen**.
+4. **Immer** vor Edit: `make ps` prüfen ob Container laufen.
+5. **Immer** nach Code-Änderung: `make rebuild` und Logs prüfen.
 
-### 1. Sammele Anforderungen (interaktiv falls fehlend)
-
-Frage den User:
-1. **Name** der Solution (lowercase, Bindestriche, z.B. `invoice-tracker`)
-2. **Was macht sie?** (1-2 Sätze)
-3. **Erste Resource** (z.B. „Rechnungen", „Verträge", „Lieferanten")
-4. **Felder der ersten Resource** (z.B. „Titel, Betrag, Datum, Status")
-
-### 2. Lade die Guides
-
-Lies in dieser Reihenfolge:
-- `~/.clever/guides/brand.md` - UI/Design (verbindlich)
-- `~/.clever/guides/architecture.md` - Stack, Folder-Struktur, Auth-Flow
-- `~/.clever/guides/conventions.md` - Code-Style
-- `~/.clever/guides/recipes/auth-page.md` - geschützte Pages
-- `~/.clever/guides/recipes/crud.md` - Standard CRUD
-
-Halte dich **strikt** an alle Guides.
-
-### 3. Pre-flight check
-
-```bash
-# Solution-Ordner allokieren + Ports finden
-SOLUTION_DIR="$HOME/.clever/solutions/<name>"
-test -d "$SOLUTION_DIR" && echo "FEHLER: Existiert bereits" && exit 1
-
-# Freie Ports finden (7100+10*N)
-bash ~/.clever/scripts/port-allocate.sh
-```
-
-### 4. Generiere die Solution
-
-Erstelle alle Dateien laut `architecture.md` Folder-Struktur:
+## Bekannte Solution-Struktur
 
 ```
-~/.clever/solutions/<name>/
-├── frontend/
+.
+├── frontend/                     Next.js 14 App Router
+│   ├── package.json              minimal: next, react, react-dom + tailwind dev
+│   ├── tailwind.config.ts        mit audius-* Farben
+│   └── src/app/
+│       ├── layout.tsx            root mit globals.css
+│       ├── page.tsx              landing
+│       └── globals.css           tailwind base
+├── backend/                      FastAPI 0.115 + SQLAlchemy 2 async
 │   ├── src/
-│   │   ├── app/(auth)/<resource>/page.tsx       # List Page (siehe crud.md)
-│   │   ├── app/(auth)/layout.tsx                 # Auth Guard (siehe auth-page.md)
-│   │   ├── app/api/auth/[...nextauth]/route.ts  # NextAuth + Keycloak
-│   │   ├── app/layout.tsx                        # Root + ThemeProvider
-│   │   └── app/page.tsx                          # Hello, $USER
-│   ├── src/lib/{api,auth,env}.ts
-│   ├── src/hooks/use-<resource>.ts
-│   ├── tailwind.config.js                        # extends @audiusintelligence/ui/preset
-│   ├── package.json                              # mit @audiusintelligence/ui dep
-│   └── Dockerfile
-├── backend/
-│   ├── src/
-│   │   ├── main.py
-│   │   ├── core/{config,db,auth,security}.py
-│   │   ├── api/{deps,me,<resource>}.py
-│   │   ├── models/{base,user,<resource>}.py
-│   │   ├── schemas/{user,<resource>}.py
-│   │   └── services/<resource>_service.py
-│   ├── alembic/{env.py, versions/001_initial.py}
-│   ├── tests/unit/test_<resource>_service.py
-│   ├── pyproject.toml                            # Ruff config
-│   └── Dockerfile
-├── docker-compose.yml                            # postgres + backend + frontend
-├── Makefile                                       # make up/down/test/lint
-├── .env.example
-├── .env                                          # auto-generiert
-├── README.md
-└── AGENTS.md                                     # solution-spezifische Conventions
+│   │   ├── main.py               app + cors
+│   │   ├── core/
+│   │   │   ├── config.py         pydantic-settings
+│   │   │   ├── db.py             AsyncEngine + Base
+│   │   │   └── auth.py           Keycloak JWT (DISABLE_AUTH=1 für lokal)
+│   │   └── api/
+│   │       ├── me.py             /api/v1/me
+│   │       └── items.py          /api/v1/items (sample CRUD - kannst du als Vorlage nutzen)
+│   └── alembic/                  Migrations
+├── docker-compose.yml            db + backend + frontend
+├── Makefile                      up/down/migrate/psql/rebuild
+└── .env                          ports + secrets (auto-generiert)
 ```
 
-**Code-Generation Regeln:**
+## Werkzeuge die du nutzt (alphabetisch)
 
-| Element | Quelle |
-|---------|--------|
-| UI-Komponenten | aus `@audiusintelligence/ui` importieren |
-| Tailwind | extends `@audiusintelligence/ui/preset` |
-| Auth-Flow | exact wie in `architecture.md` |
-| CRUD-Pattern | exact wie in `recipes/crud.md` |
-| Naming | exact wie in `conventions.md` |
-| Sprache UI | Deutsch (es sei denn User sagt anders) |
+| Tool | Zweck |
+|------|-------|
+| `bash` | Befehle ausführen, Make-Targets, docker compose |
+| `read` | Dateien lesen |
+| `edit` | bestehende Datei punktuell ändern (bevorzugt) |
+| `write` | neue Datei anlegen (nicht für Überschreiben) |
 
-### 5. Führe deterministische Setup-Schritte aus
+## Häufige Aufgaben - immer mit diesem Pattern
 
-```bash
-# Keycloak Client erstellen
-bash ~/.clever/scripts/keycloak-client.sh create <name> "<description>" <port>
+### „Modell hinzufügen"
 
-# .env mit allen Secrets generieren
-bash ~/.clever/scripts/generate-env.sh <name> <port-range>
+1. **Lies** `backend/src/api/items.py` als Vorlage
+2. **Lege** `backend/src/models/<name>.py` an mit SQLAlchemy `Mapped`-Schema
+3. **Lege** `backend/src/api/<name>.py` an (CRUD-Endpoints, importiere `get_current_user`, `get_db`)
+4. **Editiere** `backend/src/main.py` und füge `app.include_router(<name>.router)` hinzu
+5. **Editiere** `backend/alembic/env.py`: importiere `from src.api import <name>`
+6. **Bash:** `make migrate m="add <name>"`
+7. **Bash:** `make rebuild`
+8. **Bash:** `docker compose logs backend | tail -30` - keine Errors?
+9. **Bash:** `curl http://localhost:$(grep PORT_BACKEND .env | cut -d= -f2)/docs` - Routes vorhanden?
 
-# Initial git commit
-cd $SOLUTION_DIR && git init -b main && git add . && \
-  git commit -m "feat: initial scaffold of <name> solution"
-```
+### „Page hinzufügen"
 
-### 6. Starte den Stack
+1. **Lies** `frontend/src/app/page.tsx` als Vorlage
+2. **Lege** `frontend/src/app/<route>/page.tsx` an
+3. **Bash:** `make rebuild`
 
-```bash
-cd $SOLUTION_DIR
-make install      # frontend + backend deps
-make up           # docker compose
-```
+### „Auth aktivieren"
 
-### 7. Erkläre dem User die nächsten Schritte
-
-```
-✓ Solution '<name>' ist live!
-
-  Frontend:    http://localhost:<port>
-  Backend API: http://localhost:<port+1>/docs
-  DB Admin:    psql postgres://localhost:<port+2>/<name>
-
-KOLLEGEN FREISCHALTEN:
-  clever invite <name> kollege@firma.de
-
-WAS GEÄNDERT WURDE:
-  - <Resource> CRUD generiert: GET/POST/PATCH/DELETE /api/v1/<resource>
-  - Frontend List-Page: /<resource>
-  - Auth-Guard auf alle (auth)/* Pages
-  - Keycloak Client 'solution-<name>' angelegt
-
-NÄCHSTE SCHRITTE:
-  - Felder anpassen: backend/src/models/<resource>.py
-  - UI tweaken: frontend/src/app/(auth)/<resource>/page.tsx
-  - Migration nach Änderungen: make db-migrate m="add field X"
-
-DEPLOYEN:
-  clever deploy <name>      # → https://<name>.clevercompany.ai
-```
+1. **Editiere** `.env` setze `DISABLE_AUTH=0`
+2. **Bash:** `make rebuild`
+3. **Hinweis** an User: NextAuth-Setup im Frontend ist nicht standardmäßig wired - das ist ein größerer Schritt der eigene Konfiguration verlangt.
 
 ## Was du NICHT tust
 
-- ❌ Nie eigene Buttons/Inputs/Layouts bauen → immer `@audiusintelligence/ui`
-- ❌ Nie hard-coded Farben (`bg-blue-500`) → Brand-Tokens nutzen
-- ❌ Nie englische UI ohne Rückfrage
-- ❌ Nie ohne Tests committen (mindestens Smoke Test)
-- ❌ Nie Auth selbst neu erfinden → exakt das Pattern aus `architecture.md`
-- ❌ Nie ein `deploy/deploy.sh` schreiben das `clever deploy` aufruft (Endlosschleife!)
-  Stattdessen direkt `rsync` + `ssh` + `docker compose` Befehle nutzen.
-- ❌ Nie versuchen, `clever new` von innerhalb dieser Session aufzurufen.
-  Du bist bereits der Agent - du erstellst die Solution **selbst** durch Schreiben
-  von Files und Aufrufen der `~/.clever/scripts/*.sh` Helper.
+- ❌ Keinen Tailwind-Config umbauen ohne triftigen Grund
+- ❌ Kein `@audiusintelligence/ui` importieren - das gibts in audius-base nicht
+- ❌ Kein Workspace-Setup (file:../packages/...) - Standalone Solution!
+- ❌ Keine `package.json` Major-Version-Updates ohne Test
+- ❌ Nicht `output: 'export'` setzen (statisches Export bricht alles)
 
-## Bei Problemen
+## Anti-Patterns die zu Loops führen
 
-| Fehler | Fix |
-|--------|-----|
-| Keycloak Token expired | `clever auth` |
-| Port belegt | andere Solution stoppen oder `.env` Port ändern |
-| `@audiusintelligence/ui` nicht installierbar | npm Auth zum GitHub Packages Registry prüfen |
-| User not found in Keycloak | User muss sich einmal eingeloggt haben |
+| Anti-Pattern | Stattdessen |
+|--------------|-------------|
+| `npm ci` ohne lock-file | `npm install` (im Dockerfile schon richtig) |
+| `--legacy-peer-deps` Workarounds | Erst Dependency richtig deklarieren |
+| Inline-Style mit `px`/`py` Shorthand | `paddingLeft`/`paddingRight` oder Tailwind classes |
+| Per-Feature Build-Loop wenn Build kaputt | Erst alle Imports prüfen, dann **einmal** rebuilden |
 
-## Referenzen
+## Verifikation NACH jeder Änderung
 
-- Gold-Standard Apps: `clever-company/procurement` und `intelligence/insights` im Hauptrepo
-- UI Storybook: `packages/ui/storybook-static`
+Pflicht in dieser Reihenfolge:
+
+```bash
+# 1. Solution-Dir
+pwd  # muss auf ~/.clever/solutions/<slug> sein
+
+# 2. Container Status
+make ps
+
+# 3. Bei Backend-Änderung
+make rebuild
+docker compose logs backend --tail=20
+
+# 4. Bei Frontend-Änderung
+make rebuild
+docker compose logs frontend --tail=20
+
+# 5. Smoke-Tests
+PORT_BE=$(grep PORT_BACKEND .env | cut -d= -f2)
+PORT_FE=$(grep PORT_FRONTEND .env | cut -d= -f2)
+curl -fsS http://localhost:$PORT_BE/health
+curl -fsSI http://localhost:$PORT_FE/ | head -1
+```
+
+Wenn ein Smoke-Test failed → **stop**, Logs zeigen, fix die spezifische Ursache. Nicht „weiter probieren".
+
+## Wenn du wirklich nicht weißt was zu tun
+
+Sag dem User:
+> Ich brauche mehr Details. Welches Feld? Welcher Endpoint? Welche Page-Route?
+
+Niemals raten und 50 Files generieren.

@@ -1,0 +1,55 @@
+name: __SOLUTION_NAME__
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: __SOLUTION_NAME__-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-audius}
+      POSTGRES_USER: ${POSTGRES_USER:-audius}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-audius}
+    ports:
+      - "127.0.0.1:${PORT_DB:-5432}:5432"
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-audius}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    container_name: __SOLUTION_NAME__-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-audius}:${POSTGRES_PASSWORD:-audius}@db:5432/${POSTGRES_DB:-audius}
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER:-https://id.clevercompany.ai/realms/solutions}
+      KEYCLOAK_AUDIENCE: solution-__SOLUTION_NAME__
+      DISABLE_AUTH: ${DISABLE_AUTH:-1}
+      CORS_ORIGINS: '["http://localhost:${PORT_FRONTEND:-3000}"]'
+    ports:
+      - "127.0.0.1:${PORT_BACKEND:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "alembic upgrade head && uvicorn src.main:app --host 0.0.0.0 --port 8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:${PORT_BACKEND:-8000}
+    container_name: __SOLUTION_NAME__-frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:${PORT_BACKEND:-8000}
+    ports:
+      - "127.0.0.1:${PORT_FRONTEND:-3000}:3000"
+    depends_on:
+      - backend
+
+volumes:
+  dbdata:
