@@ -56,8 +56,11 @@ fetch "guides/recipes/crud.md"        "$CLEVER_HOME/guides/recipes/crud.md"
 
 # opencode Integration
 fetch "agent/clever-solution.md"      "$OPENCODE_DIR/agent/clever-solution.md"
-fetch "command/new-solution.md"       "$OPENCODE_DIR/command/new-solution.md"
-fetch "command/invite.md"             "$OPENCODE_DIR/command/invite.md"
+for cmd in new add inspect up rebuild logs page invite deploy; do
+  fetch "command/$cmd.md"             "$OPENCODE_DIR/command/$cmd.md"
+done
+# Alte command files entfernen
+rm -f "$OPENCODE_DIR/command/new-solution.md"
 
 # Scripts
 fetch "scripts/clever"                "$CLEVER_HOME/scripts/clever"

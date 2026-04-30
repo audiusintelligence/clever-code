@@ -1,17 +1,8 @@
 ---
-description: Schalte einen User für eine Clever Solution frei (Keycloak Group)
+description: User für Solution freischalten
 agent: clever-solution
 ---
 
-User für eine Solution freischalten.
+`clever invite <slug> <email>`
 
-Argumente:
-- $1 = Solution Name
-- $2 = Email des Users
-
-Falls fehlend: nachfragen.
-
-Führe aus:
-```bash
-bash ~/.clever/scripts/keycloak-client.sh invite $1 $2
-```
+Falls Token expired → erst `clever auth`.
