@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# clever - Clever Solution CLI
+# Wrapper. Die meiste Arbeit macht opencode + die Guides in ~/.clever/guides/
+set -euo pipefail
+
+CLEVER_HOME="${CLEVER_HOME:-$HOME/.clever}"
+
+case "${1:-help}" in
+  auth)
+    bash "$CLEVER_HOME/scripts/keycloak-client.sh" auth
+    ;;
+  invite)
+    shift
+    bash "$CLEVER_HOME/scripts/keycloak-client.sh" invite "$@"
+    ;;
+  list)
+    if [ -d "$CLEVER_HOME/solutions" ] && [ -n "$(ls -A $CLEVER_HOME/solutions 2>/dev/null)" ]; then
+      ls -1 "$CLEVER_HOME/solutions/"
+    else
+      echo "Noch keine Solutions. Anlegen: opencode \"neue Solution my-app\""
+    fi
+    ;;
+  new)
+    shift
+    if command -v opencode >/dev/null 2>&1; then
+      exec opencode "Erstelle eine neue Clever Solution namens $* (folge dem Agent clever-solution)"
+    else
+      echo "✗ opencode nicht installiert. Installation:"
+      echo "  curl -fsSL https://opencode.ai/install | bash"
+      exit 1
+    fi
+    ;;
+  deploy)
+    shift
+    NAME="$1"
+    cd "$CLEVER_HOME/solutions/$NAME"
+    [ -f deploy/deploy.sh ] && bash deploy/deploy.sh "$@" || \
+      echo "Kein deploy/deploy.sh - opencode kann eines generieren: opencode 'füge deploy script hinzu'"
+    ;;
+  update)
+    echo "→ Update Guides und Scripts..."
+    curl -fsSL "${CLEVER_INSTALLER_BASE:-https://code.clevercompany.ai}/install" | bash
+    ;;
+  help|--help|-h|"")
+    cat <<EOF
+clever - Clever Solution CLI
+
+USAGE:
+  clever auth                    Keycloak Admin Login (einmalig pro 5 min)
+  clever new <name>              Erstelle Solution (ruft opencode)
+  clever invite <name> <email>   User für Solution freischalten
+  clever list                    Alle eigenen Solutions
+  clever deploy <name>           Solution deployen
+  clever update                  Guides + Scripts aktualisieren
+
+ERSTE SCHRITTE (Mac, von 0):
+  1. brew install --cask docker          (falls nicht da)
+  2. curl -fsSL https://opencode.ai/install | bash
+  3. curl -fsSL https://code.clevercompany.ai/install | bash
+  4. clever auth
+  5. clever new my-first-solution
+
+DOKUMENTATION:
+  ~/.clever/guides/                # alle Guides
+  https://code.clevercompany.ai    # online
+EOF
+    ;;
+  *)
+    echo "Unbekannt: $1 (versuche 'clever help')"
+    exit 1
+    ;;
+esac

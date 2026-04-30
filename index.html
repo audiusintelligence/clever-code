@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clever Code - Solutions in Minuten</title>
+<style>
+  :root {
+    --primary: #0066cc;
+    --bg: #fafafa;
+    --text: #1d1d1f;
+    --muted: #6e6e73;
+    --code-bg: #1d1d1f;
+    --code-text: #f5f5f7;
+    --border: #d2d2d7;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .container { max-width: 880px; margin: 0 auto; padding: 4rem 2rem; }
+  h1 {
+    font-size: 3rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 0.5rem;
+  }
+  h1 span { color: var(--primary); }
+  .tagline {
+    font-size: 1.25rem;
+    color: var(--muted);
+    margin-bottom: 3rem;
+  }
+  h2 { font-size: 1.5rem; margin: 2.5rem 0 1rem; }
+  pre {
+    background: var(--code-bg);
+    color: var(--code-text);
+    padding: 1.25rem;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.9rem;
+    line-height: 1.6;
+  }
+  code { font-family: "SF Mono", Menlo, Consolas, monospace; }
+  p code, li code, td code {
+    background: rgba(0, 0, 0, 0.06);
+    padding: 0.15em 0.4em;
+    border-radius: 4px;
+    font-size: 0.9em;
+  }
+  ol { padding-left: 1.5rem; margin: 1rem 0; }
+  ol li { margin-bottom: 0.75rem; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.95rem;
+  }
+  td, th {
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+  }
+  th { font-weight: 600; }
+  .footer { margin-top: 4rem; padding-top: 2rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.875rem; }
+  a { color: var(--primary); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1><span>clever</span> code</h1>
+<p class="tagline">Eine Clever Solution in 5 Minuten — direkt vom Mac, ohne Repo-Klon.</p>
+
+<h2>Installation (einmalig)</h2>
+<pre><code># 1. Docker
+brew install --cask docker
+
+# 2. opencode
+curl -fsSL https://opencode.ai/install | bash
+
+# 3. Clever Toolchain
+curl -fsSL https://code.clevercompany.ai/install | bash
+
+# 4. Keycloak Login
+clever auth</code></pre>
+
+<h2>Erste Solution erstellen</h2>
+<pre><code>clever new invoice-tracker
+# oder
+opencode "neue Clever Solution namens invoice-tracker für Rechnungen"</code></pre>
+
+<p>opencode liest die Guides, generiert frischen Code, legt einen Keycloak-Client an, startet den Stack. Nach 2 Minuten ist <code>http://localhost:7100</code> live.</p>
+
+<h2>Was wird installiert?</h2>
+<table>
+  <tr><th>Pfad</th><th>Inhalt</th></tr>
+  <tr><td><code>~/.clever/guides/</code></td><td>Brand, Architecture, Conventions, Recipes</td></tr>
+  <tr><td><code>~/.clever/scripts/</code></td><td>Keycloak Helper, clever CLI</td></tr>
+  <tr><td><code>~/.clever/solutions/</code></td><td>Deine erstellten Solutions</td></tr>
+  <tr><td><code>~/.config/opencode/agent/</code></td><td>clever-solution Agent</td></tr>
+</table>
+
+<h2>Befehle</h2>
+<table>
+  <tr><th>Command</th><th>Was</th></tr>
+  <tr><td><code>clever auth</code></td><td>Keycloak Admin Login (einmalig pro 5min)</td></tr>
+  <tr><td><code>clever new &lt;name&gt;</code></td><td>Neue Solution (ruft opencode)</td></tr>
+  <tr><td><code>clever invite &lt;name&gt; &lt;email&gt;</code></td><td>User freischalten</td></tr>
+  <tr><td><code>clever list</code></td><td>Eigene Solutions zeigen</td></tr>
+  <tr><td><code>clever deploy &lt;name&gt;</code></td><td>Auf Production deployen</td></tr>
+  <tr><td><code>clever update</code></td><td>Guides + Scripts aktualisieren</td></tr>
+</table>
+
+<h2>Wie funktioniert das?</h2>
+<ol>
+  <li><strong>opencode</strong> ist die UX — fragt was du willst, erklärt was passiert</li>
+  <li><strong>Guides</strong> in <code>~/.clever/guides/</code> sind die Quelle für Branding, Architektur, Code-Style</li>
+  <li><strong>Bash Scripts</strong> machen nur die deterministischen Sachen (Keycloak API, Ports, Deploy)</li>
+  <li>Der <strong>Code wird generiert</strong>, nicht aus einem Template kopiert. Das heißt: jede Solution ist auf den Use Case zugeschnitten.</li>
+</ol>
+
+<div class="footer">
+  <p>Source: <a href="https://github.com/audiusintelligence/code">github.com/audiusintelligence/code</a> · Slack: <code>#clever-solutions</code></p>
+</div>
+
+</div>
+</body>
+</html>
