@@ -9,6 +9,10 @@ case "${1:-help}" in
   auth)
     bash "$CLEVER_HOME/scripts/keycloak-client.sh" auth
     ;;
+  check)
+    shift
+    bash "$CLEVER_HOME/scripts/check-slug.sh" "$@"
+    ;;
   invite)
     shift
     bash "$CLEVER_HOME/scripts/keycloak-client.sh" invite "$@"
@@ -22,6 +26,13 @@ case "${1:-help}" in
     ;;
   new)
     shift
+    SLUG="${1:-}"
+    if [[ -z "$SLUG" ]]; then
+      echo "Usage: clever new <slug>"
+      exit 1
+    fi
+    # Slug-Verfügbarkeit zuerst prüfen
+    bash "$CLEVER_HOME/scripts/check-slug.sh" "$SLUG" || exit 1
     if command -v opencode >/dev/null 2>&1; then
       exec opencode "Erstelle eine neue Clever Solution namens $* (folge dem Agent clever-solution)"
     else
@@ -47,6 +58,7 @@ clever - Clever Solution CLI
 
 USAGE:
   clever auth                    Keycloak Admin Login (einmalig pro 5 min)
+  clever check <slug>            Prüfe ob Slug/Subdomain verfügbar
   clever new <name>              Erstelle Solution (ruft opencode)
   clever invite <name> <email>   User für Solution freischalten
   clever list                    Alle eigenen Solutions
