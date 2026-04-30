@@ -25,13 +25,97 @@ token() {
 
 case "${1:-help}" in
   auth)
-    echo "Keycloak Admin Login ($KC_BASE)"
-    read -p "  Username: " U
-    read -sp "  Password: " P; echo
-    T=$(get_token "$U" "$P") || { echo "✗ Login fehlgeschlagen"; exit 1; }
-    echo "$T" > "$CLEVER_HOME/admin-token"
-    chmod 600 "$CLEVER_HOME/admin-token"
-    echo "✓ Token gespeichert (gültig ~5 min)"
+    MODE="${2:-browser}"
+    if [[ "$MODE" == "--password" ]] || [[ "$MODE" == "password" ]]; then
+      # Klassischer Password-Flow
+      echo "Keycloak Admin Login ($KC_BASE) - Password Flow"
+      read -p "  Username: " U
+      read -sp "  Password: " P; echo
+      T=$(get_token "$U" "$P") || { echo "✗ Login fehlgeschlagen"; exit 1; }
+      echo "$T" > "$CLEVER_HOME/admin-token"
+      chmod 600 "$CLEVER_HOME/admin-token"
+      echo "✓ Token gespeichert (gültig ~5 min)"
+      exit 0
+    fi
+
+    # Browser-Flow via Device Authorization Grant (Standard für CLIs)
+    DEVICE_CLIENT="${CLEVER_DEVICE_CLIENT_ID:-clever-cli}"
+
+    DEVICE_RESP=$(curl -fsS -X POST \
+      "$KC_BASE/realms/$KC_ADMIN_REALM/protocol/openid-connect/auth/device" \
+      -H "Content-Type: application/x-www-form-urlencoded" \
+      -d "client_id=$DEVICE_CLIENT&scope=openid" 2>/dev/null) || {
+        echo "✗ Device-Flow nicht verfügbar (Client '$DEVICE_CLIENT' existiert nicht oder Device-Flow nicht aktiviert)"
+        echo
+        echo "  Fallback: clever auth --password"
+        echo
+        echo "  Oder ein Admin richtet einmalig den Client ein (siehe Doku)."
+        exit 1
+      }
+
+    DEVICE_CODE=$(echo "$DEVICE_RESP"  | python3 -c "import sys,json;print(json.load(sys.stdin)['device_code'])")
+    USER_CODE=$(echo "$DEVICE_RESP"    | python3 -c "import sys,json;print(json.load(sys.stdin)['user_code'])")
+    VERIFY_URI=$(echo "$DEVICE_RESP"   | python3 -c "import sys,json;print(json.load(sys.stdin)['verification_uri_complete'])")
+    INTERVAL=$(echo "$DEVICE_RESP"     | python3 -c "import sys,json;print(json.load(sys.stdin).get('interval',5))")
+    EXPIRES=$(echo "$DEVICE_RESP"      | python3 -c "import sys,json;print(json.load(sys.stdin).get('expires_in',600))")
+
+    echo "Keycloak Login - Browser öffnet sich..."
+    echo
+    echo "  Code: $USER_CODE"
+    echo "  URL:  $VERIFY_URI"
+    echo
+
+    # Browser öffnen (macOS, Linux, WSL)
+    if command -v open >/dev/null 2>&1; then
+      open "$VERIFY_URI"
+    elif command -v xdg-open >/dev/null 2>&1; then
+      xdg-open "$VERIFY_URI" >/dev/null 2>&1
+    elif command -v explorer.exe >/dev/null 2>&1; then
+      explorer.exe "$VERIFY_URI"
+    else
+      echo "(Browser nicht automatisch geöffnet - bitte URL manuell öffnen)"
+    fi
+
+    echo "Warte auf Login im Browser..."
+    DEADLINE=$(( $(date +%s) + EXPIRES ))
+    while [[ $(date +%s) -lt $DEADLINE ]]; do
+      sleep "$INTERVAL"
+      TOK_RESP=$(curl -sS -X POST \
+        "$KC_BASE/realms/$KC_ADMIN_REALM/protocol/openid-connect/token" \
+        -H "Content-Type: application/x-www-form-urlencoded" \
+        -d "grant_type=urn:ietf:params:oauth:grant-type:device_code&device_code=$DEVICE_CODE&client_id=$DEVICE_CLIENT" 2>/dev/null)
+
+      ERR=$(echo "$TOK_RESP" | python3 -c "import sys,json
+try: print(json.load(sys.stdin).get('error',''))
+except: print('')" 2>/dev/null)
+
+      case "$ERR" in
+        authorization_pending|slow_down) printf "." ;;
+        "")
+          # Erfolgreich
+          T=$(echo "$TOK_RESP" | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
+          echo
+          echo "$T" > "$CLEVER_HOME/admin-token"
+          chmod 600 "$CLEVER_HOME/admin-token"
+          echo "✓ Token gespeichert (gültig ~5 min)"
+          exit 0
+          ;;
+        expired_token|access_denied)
+          echo
+          echo "✗ Login abgebrochen oder abgelaufen"
+          exit 1
+          ;;
+        *)
+          echo
+          echo "✗ Fehler: $ERR"
+          echo "$TOK_RESP"
+          exit 1
+          ;;
+      esac
+    done
+    echo
+    echo "✗ Timeout - Login nicht innerhalb von ${EXPIRES}s abgeschlossen"
+    exit 1
     ;;
 
   create)
