@@ -32,7 +32,7 @@ SOLDIR="$CLEVER_HOME/solutions/$SLUG"
 
 # Naming: ResourceName -> resource_name (snake_case), resources (plural)
 NAME_PASCAL="$RES"
-NAME_SNAKE=$(echo "$RES" | sed -E 's/([a-z0-9])([A-Z])/\1_\2/g; s/.*/\L&/')
+NAME_SNAKE=$(echo "$RES" | sed -E 's/([a-z0-9])([A-Z])/\1_\2/g' | tr '[:upper:]' '[:lower:]')
 NAME_PLURAL="${NAME_SNAKE}s"
 NAME_KEBAB=$(echo "$NAME_SNAKE" | tr '_' '-')
 
