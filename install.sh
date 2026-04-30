@@ -64,6 +64,10 @@ fetch "scripts/clever"                "$CLEVER_HOME/scripts/clever"
 fetch "scripts/keycloak-client.sh"    "$CLEVER_HOME/scripts/keycloak-client.sh"
 fetch "scripts/check-slug.sh"         "$CLEVER_HOME/scripts/check-slug.sh"
 fetch "scripts/scaffold.sh"           "$CLEVER_HOME/scripts/scaffold.sh"
+fetch "scripts/add-resource.sh"       "$CLEVER_HOME/scripts/add-resource.sh"
+fetch "scripts/add-page.sh"           "$CLEVER_HOME/scripts/add-page.sh"
+fetch "scripts/inspect.sh"            "$CLEVER_HOME/scripts/inspect.sh"
+fetch "scripts/up.sh"                 "$CLEVER_HOME/scripts/up.sh"
 
 chmod +x "$CLEVER_HOME/scripts/"*
 ok "alle Files installiert"

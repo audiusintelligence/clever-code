@@ -45,6 +45,37 @@ case "${1:-help}" in
     exec opencode run --agent clever-solution "Aktuelle Solution: $SLUG (CWD: $SOLDIR). Aufgabe: $PROMPT"
     ;;
 
+  add-resource)
+    shift
+    bash "$CLEVER_HOME/scripts/add-resource.sh" "$@"
+    ;;
+  add-page)
+    shift
+    bash "$CLEVER_HOME/scripts/add-page.sh" "$@"
+    ;;
+  inspect)
+    shift
+    bash "$CLEVER_HOME/scripts/inspect.sh" "$@"
+    ;;
+  up)
+    shift
+    bash "$CLEVER_HOME/scripts/up.sh" "$@"
+    ;;
+  rebuild)
+    shift
+    SLUG="${1:-}"
+    SOLDIR="$CLEVER_HOME/solutions/$SLUG"
+    [[ ! -d "$SOLDIR" ]] && { echo "✗ Solution '$SLUG' fehlt"; exit 1; }
+    cd "$SOLDIR" && exec docker compose up -d --build
+    ;;
+  logs)
+    shift
+    SLUG="${1:-}"; SVC="${2:-}"
+    SOLDIR="$CLEVER_HOME/solutions/$SLUG"
+    [[ ! -d "$SOLDIR" ]] && { echo "✗ Solution '$SLUG' fehlt"; exit 1; }
+    cd "$SOLDIR" && exec docker compose logs --tail=50 $SVC
+    ;;
+
   deploy)
     shift
     NAME="${1:-}"
@@ -84,14 +115,28 @@ case "${1:-help}" in
 clever - Clever Solution CLI
 
 USAGE:
-  clever auth                       Keycloak Admin Login (Browser)
-  clever check <slug>               Slug/Subdomain verfügbar?
-  clever new <slug> ["desc"]        Solution scaffolden (deterministisch, kein LLM)
-  clever extend <slug> "prompt"     Solution mit opencode erweitern
-  clever invite <slug> <email>      User freischalten
-  clever list                       Eigene Solutions
-  clever deploy <slug>              Production Deploy
-  clever update                     Toolchain aktualisieren
+  Setup:
+    clever auth                            Keycloak Admin Login (Browser)
+    clever check <slug>                    Slug verfügbar?
+    clever new <slug> ["desc"]             Neue Solution (deterministisch)
+    clever update                          Toolchain aktualisieren
+
+  Lifecycle:
+    clever up <slug>                       Build + Start + warte auf Health
+    clever rebuild <slug>                  Container neu bauen + starten
+    clever logs <slug> [service]           Logs (backend|frontend|db)
+    clever list                            Eigene Solutions
+    clever inspect <slug>                  Strukturierte Übersicht
+
+  Extend (Generators):
+    clever add-resource <slug> <Name> [field:type ...]
+                                           CRUD generieren (Model+Schema+Router+Migration+Page)
+    clever add-page <slug> <route> [title] Einfache Page hinzufügen
+    clever extend <slug> "<prompt>"        Mit opencode erweitern (LLM)
+
+  Production:
+    clever invite <slug> <email>           User freischalten
+    clever deploy <slug>                   Production Deploy
 
 ERSTE SCHRITTE:
   1. curl -fsSL https://opencode.ai/install | bash
