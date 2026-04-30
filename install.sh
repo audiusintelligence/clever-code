@@ -12,7 +12,7 @@ INSTALLER_BASE="${CLEVER_INSTALLER_BASE:-https://code.clevercompany.ai}"
 CLEVER_HOME="${CLEVER_HOME:-$HOME/.clever}"
 OPENCODE_DIR="${OPENCODE_DIR:-$HOME/.config/opencode}"
 
-GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
+GREEN=$'\033[0;32m'; YELLOW=$'\033[1;33m'; RED=$'\033[0;31m'; NC=$'\033[0m'
 ok()   { echo -e "${GREEN}✓${NC} $1"; }
 warn() { echo -e "${YELLOW}!${NC} $1"; }
 err()  { echo -e "${RED}✗${NC} $1"; exit 1; }
