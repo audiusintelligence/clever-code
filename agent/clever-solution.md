@@ -151,6 +151,11 @@ DEPLOYEN:
 - ❌ Nie englische UI ohne Rückfrage
 - ❌ Nie ohne Tests committen (mindestens Smoke Test)
 - ❌ Nie Auth selbst neu erfinden → exakt das Pattern aus `architecture.md`
+- ❌ Nie ein `deploy/deploy.sh` schreiben das `clever deploy` aufruft (Endlosschleife!)
+  Stattdessen direkt `rsync` + `ssh` + `docker compose` Befehle nutzen.
+- ❌ Nie versuchen, `clever new` von innerhalb dieser Session aufzurufen.
+  Du bist bereits der Agent - du erstellst die Solution **selbst** durch Schreiben
+  von Files und Aufrufen der `~/.clever/scripts/*.sh` Helper.
 
 ## Bei Problemen
 

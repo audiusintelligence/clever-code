@@ -28,25 +28,62 @@ case "${1:-help}" in
     shift
     SLUG="${1:-}"
     if [[ -z "$SLUG" ]]; then
-      echo "Usage: clever new <slug>"
+      echo "Usage: clever new <slug> [beschreibung]"
       exit 1
     fi
-    # Slug-Verfügbarkeit zuerst prüfen
+
+    # Recursion-Schutz: nicht von innerhalb opencode 'clever new' erneut aufrufen
+    if [[ -n "${OPENCODE_SESSION_ID:-}${OPENCODE_AGENT:-}" ]]; then
+      echo "✗ Du bist bereits in einer opencode-Session."
+      echo "  Bitte Slash-Command nutzen: /new-solution $*"
+      exit 1
+    fi
+
     bash "$CLEVER_HOME/scripts/check-slug.sh" "$SLUG" || exit 1
-    if command -v opencode >/dev/null 2>&1; then
-      exec opencode "Erstelle eine neue Clever Solution namens $* (folge dem Agent clever-solution)"
-    else
+
+    if ! command -v opencode >/dev/null 2>&1; then
       echo "✗ opencode nicht installiert. Installation:"
       echo "  curl -fsSL https://opencode.ai/install | bash"
       exit 1
     fi
+
+    # opencode mit korrektem 'run' Subkommando und expliziter Agent-Auswahl
+    DESC="${*:2}"
+    PROMPT="Erstelle eine neue Clever Solution namens '$SLUG'"
+    [[ -n "$DESC" ]] && PROMPT="$PROMPT für: $DESC"
+    PROMPT="$PROMPT. Folge strikt dem clever-solution Agent und den Guides in ~/.clever/guides/."
+    exec opencode run --agent clever-solution "$PROMPT"
     ;;
+
   deploy)
     shift
-    NAME="$1"
-    cd "$CLEVER_HOME/solutions/$NAME"
-    [ -f deploy/deploy.sh ] && bash deploy/deploy.sh "$@" || \
-      echo "Kein deploy/deploy.sh - opencode kann eines generieren: opencode 'füge deploy script hinzu'"
+    NAME="${1:-}"
+    [[ -z "$NAME" ]] && { echo "Usage: clever deploy <slug>"; exit 1; }
+
+    # Loop-Schutz: deploy.sh darf nicht 'clever deploy' aufrufen
+    if [[ "${CLEVER_DEPLOY_RUNNING:-}" == "1" ]]; then
+      echo "✗ Endlosschleife erkannt: deploy.sh ruft 'clever deploy' rekursiv auf."
+      echo "  Bitte ${CLEVER_HOME}/solutions/${NAME}/deploy/deploy.sh anpassen -"
+      echo "  direkt 'docker compose ...' / 'rsync ...' nutzen, nicht 'clever deploy'."
+      exit 1
+    fi
+    export CLEVER_DEPLOY_RUNNING=1
+
+    SOLDIR="$CLEVER_HOME/solutions/$NAME"
+    [[ ! -d "$SOLDIR" ]] && { echo "✗ Solution '$NAME' existiert nicht in $SOLDIR"; exit 1; }
+
+    if [[ -f "$SOLDIR/deploy/deploy.sh" ]]; then
+      cd "$SOLDIR" && bash deploy/deploy.sh "${@:2}"
+    else
+      echo "Kein deploy/deploy.sh vorhanden."
+      echo "  Lass opencode eines generieren oder schreibe es manuell."
+      echo "  Pfad: $SOLDIR/deploy/deploy.sh"
+      echo
+      echo "  Es darf NICHT 'clever deploy' aufrufen, sondern direkt:"
+      echo "    rsync -av . user@host2.audius.local:/srv/clevercompany/solutions/$NAME/"
+      echo "    ssh user@host2.audius.local 'cd /srv/clevercompany/solutions/$NAME && docker compose up -d --build'"
+      exit 1
+    fi
     ;;
   update)
     echo "→ Update Guides und Scripts..."
