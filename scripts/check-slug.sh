@@ -14,7 +14,7 @@ fi
 
 CLEVER_HOME="${CLEVER_HOME:-$HOME/.clever}"
 KC_BASE="${KEYCLOAK_BASE:-https://id.clevercompany.ai}"
-KC_REALM="${KEYCLOAK_REALM:-clevercompany}"
+KC_REALM="${KEYCLOAK_REALM:-solutions}"
 GATEWAY="${GATEWAY:-http://code.clevercompany.ai}"
 
 GREEN='\033[0;32m'; RED='\033[0;31m'; YELLOW='\033[1;33m'; NC='\033[0m'
@@ -31,10 +31,8 @@ else
     ok  "Lokal: kein Konflikt"
 fi
 
-# 2. Gateway / Subdomain
-HTTP_BODY=$(curl -sS --max-time 5 \
-    -H "Host: ${SLUG}.clevercompany.ai" \
-    "$GATEWAY/" 2>/dev/null || echo "TIMEOUT")
+# 2. Gateway / Subdomain - direkt die Subdomain abfragen (DNS Wildcard löst zum Gateway auf)
+HTTP_BODY=$(curl -sSL --max-time 5 "https://${SLUG}.clevercompany.ai/" 2>/dev/null || echo "TIMEOUT")
 
 if echo "$HTTP_BODY" | grep -q "solution_not_found"; then
     ok  "Subdomain: ${SLUG}.clevercompany.ai ist frei"

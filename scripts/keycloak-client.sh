@@ -5,22 +5,59 @@ set -euo pipefail
 
 CLEVER_HOME="${CLEVER_HOME:-$HOME/.clever}"
 KC_BASE="${KEYCLOAK_BASE:-https://id.clevercompany.ai}"
-KC_REALM="${KEYCLOAK_REALM:-clevercompany}"
+KC_REALM="${KEYCLOAK_REALM:-solutions}"
 KC_ADMIN_REALM="master"
 mkdir -p "$CLEVER_HOME"
 
 get_token() {
-  curl -fsS -X POST \
+  RESP=$(curl -fsS -X POST \
     "$KC_BASE/realms/$KC_ADMIN_REALM/protocol/openid-connect/token" \
     -H "Content-Type: application/x-www-form-urlencoded" \
-    -d "grant_type=password&client_id=admin-cli&username=$1&password=$2" \
-    | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])"
+    -d "grant_type=password&client_id=admin-cli&username=$1&password=$2")
+  AT=$(echo "$RESP" | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
+  RT=$(echo "$RESP" | python3 -c "import sys,json;print(json.load(sys.stdin).get('refresh_token',''))")
+  [[ -n "$RT" ]] && echo "$RT" > "$CLEVER_HOME/admin-refresh"
+  echo "$AT"
 }
 
 token() {
   test -f "$CLEVER_HOME/admin-token" || {
     echo "✗ Bitte erst 'clever auth' ausführen." >&2; exit 1; }
-  cat "$CLEVER_HOME/admin-token"
+
+  # Token-Lifespan prüfen, ggf. via Refresh erneuern
+  T="$(cat $CLEVER_HOME/admin-token)"
+  EXP=$(echo "$T" | cut -d. -f2 | base64 -d 2>/dev/null \
+         | python3 -c "import sys,json,time;d=json.load(sys.stdin);print(d.get('exp',0)-int(time.time()))" 2>/dev/null || echo 0)
+
+  if [[ "$EXP" -gt 30 ]]; then
+    echo "$T"
+    return
+  fi
+
+  # Refresh-Token nutzen
+  if [[ -f "$CLEVER_HOME/admin-refresh" ]]; then
+    RT="$(cat $CLEVER_HOME/admin-refresh)"
+    DEVICE_CLIENT="${CLEVER_DEVICE_CLIENT_ID:-clever-cli}"
+    NEW=$(curl -sS -X POST \
+      "$KC_BASE/realms/$KC_ADMIN_REALM/protocol/openid-connect/token" \
+      -H "Content-Type: application/x-www-form-urlencoded" \
+      -d "grant_type=refresh_token&client_id=$DEVICE_CLIENT&refresh_token=$RT" 2>/dev/null)
+    NEW_AT=$(echo "$NEW" | python3 -c "import sys,json
+try: print(json.load(sys.stdin).get('access_token',''))
+except: print('')" 2>/dev/null)
+    NEW_RT=$(echo "$NEW" | python3 -c "import sys,json
+try: print(json.load(sys.stdin).get('refresh_token',''))
+except: print('')" 2>/dev/null)
+    if [[ -n "$NEW_AT" ]]; then
+      echo "$NEW_AT" > "$CLEVER_HOME/admin-token"
+      [[ -n "$NEW_RT" ]] && echo "$NEW_RT" > "$CLEVER_HOME/admin-refresh"
+      echo "$NEW_AT"
+      return
+    fi
+  fi
+
+  echo "✗ Token abgelaufen. 'clever auth' erneut ausführen." >&2
+  exit 1
 }
 
 case "${1:-help}" in
@@ -92,12 +129,14 @@ except: print('')" 2>/dev/null)
       case "$ERR" in
         authorization_pending|slow_down) printf "." ;;
         "")
-          # Erfolgreich
-          T=$(echo "$TOK_RESP" | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
+          # Erfolgreich - access + refresh token speichern
+          T=$(echo "$TOK_RESP"  | python3 -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
+          RT=$(echo "$TOK_RESP" | python3 -c "import sys,json;print(json.load(sys.stdin).get('refresh_token',''))")
           echo
-          echo "$T" > "$CLEVER_HOME/admin-token"
-          chmod 600 "$CLEVER_HOME/admin-token"
-          echo "✓ Token gespeichert (gültig ~5 min)"
+          echo "$T"  > "$CLEVER_HOME/admin-token"
+          [[ -n "$RT" ]] && echo "$RT" > "$CLEVER_HOME/admin-refresh"
+          chmod 600 "$CLEVER_HOME/admin-token" "$CLEVER_HOME/admin-refresh" 2>/dev/null
+          echo "✓ Token gespeichert (auto-refresh aktiv)"
           exit 0
           ;;
         expired_token|access_denied)
