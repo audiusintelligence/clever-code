@@ -45,22 +45,28 @@ fi
 
 # 3. Keycloak Client
 if [[ -f "$CLEVER_HOME/admin-token" ]]; then
-    TOKEN="$(cat $CLEVER_HOME/admin-token)"
-    EXISTS=$(curl -sS --max-time 5 \
-        "$KC_BASE/admin/realms/$KC_REALM/clients?clientId=solution-${SLUG}" \
-        -H "Authorization: Bearer $TOKEN" 2>/dev/null \
-        | python3 -c "import sys,json
+    # Auto-Refresh nutzen (keycloak-client.sh token) statt rohem Token-File:
+    # der Access-Token lebt nur ~5 min, das Refresh-Token deutlich laenger.
+    TOKEN="$(bash "$(dirname "${BASH_SOURCE[0]}")/keycloak-client.sh" token 2>/dev/null)" || TOKEN=""
+    if [[ -z "$TOKEN" ]]; then
+        warn "Keycloak: Token abgelaufen, Refresh fehlgeschlagen ('clever auth' erneut)"
+    else
+        EXISTS=$(curl -sS --max-time 5 \
+            "$KC_BASE/admin/realms/$KC_REALM/clients?clientId=solution-${SLUG}" \
+            -H "Authorization: Bearer $TOKEN" 2>/dev/null \
+            | python3 -c "import sys,json
 try:
     d=json.load(sys.stdin)
     print(len(d) if isinstance(d, list) else 'ERROR')
 except Exception:
     print('ERROR')" )
 
-    case "$EXISTS" in
-        0)       ok "Keycloak: Client solution-${SLUG} ist frei" ;;
-        ERROR)   warn "Keycloak: Token abgelaufen oder Auth-Fehler ('clever auth' erneut)" ;;
-        *)       fail "Keycloak: Client solution-${SLUG} existiert bereits" ;;
-    esac
+        case "$EXISTS" in
+            0)       ok "Keycloak: Client solution-${SLUG} ist frei" ;;
+            ERROR)   warn "Keycloak: Auth-Fehler beim Client-Check ('clever auth' erneut)" ;;
+            *)       fail "Keycloak: Client solution-${SLUG} existiert bereits" ;;
+        esac
+    fi
 else
     warn "Keycloak: kein Admin-Token (überspringe — 'clever auth' für vollständigen Check)"
 fi

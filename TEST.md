@@ -115,33 +115,39 @@ TEST_SLUG="test-$(whoami)-1"
 clever check "$TEST_SLUG"
 ```
 
-Dann opencode triggern:
+Dann **deterministisch** scaffolden (kein LLM):
 
 ```bash
-opencode "Erstelle eine neue Clever Solution namens $TEST_SLUG für eine einfache Aufgaben-Liste mit Titel, Beschreibung und Status (offen/erledigt). Nutze den clever-solution Agent."
+clever new "$TEST_SLUG" "Einfache Test-Solution"
+clever up "$TEST_SLUG"          # Build + Start + Health-Wait (fehlert sichtbar)
 ```
 
-**Was passiert (ca. 2-5 min):**
+Optional ein Datenmodell + List-UI generieren (ebenfalls deterministisch):
 
-opencode wird interaktiv:
-1. **Liest die Guides** aus `~/.clever/guides/`
-2. **Fragt nach** falls Infos fehlen (Felder, Sprache)
-3. **Generiert** ~40-50 Dateien:
+```bash
+clever add-resource "$TEST_SLUG" Task title:str done:bool
+clever up "$TEST_SLUG"
+```
+
+**Was passiert (ca. 1-3 min):**
+
+1. `clever new` lädt **31 Template-Dateien** vom Gateway (deterministisch, ohne LLM):
    - `~/.clever/solutions/<SLUG>/frontend/` (Next.js)
    - `~/.clever/solutions/<SLUG>/backend/` (FastAPI)
    - `docker-compose.yml`, `Makefile`, `.env`
-4. **Ruft** `keycloak-client.sh create` auf → legt `solution-<SLUG>` Client + Group an
-5. **Startet** den Stack via `make up`
-6. **Sagt dir** die URLs
+2. **Personalisiert**: Slug, Beschreibung, Ports `7100+10·N` (7100 nur, wenn noch keine Solution existiert), zufälliges DB-Passwort
+3. **Legt Keycloak-Client + Group** `solution-<SLUG>` an (nur, wenn vorher `clever auth` lief)
+4. `clever up` baut die Images und wartet auf Health — bleibt das Backend unhealthy, bricht es **mit Log-Auszug ab**
 
 **Erwartete End-Ausgabe:**
 
 ```
-✓ Solution '<SLUG>' ist live!
+✓ Backend ready
+✓ Frontend ready
 
-  Frontend:    http://localhost:7100
-  Backend API: http://localhost:7101/docs
-  DB Admin:    psql postgres://localhost:7102/<slug>
+Open these:
+  Frontend:  http://localhost:7100
+  Backend:   http://localhost:7101/docs
 ```
 
 **Bricht es ab? Häufige Probleme:**
@@ -163,14 +169,21 @@ opencode wird interaktiv:
 open http://localhost:7100
 ```
 
-Du wirst auf `id.clevercompany.ai` weitergeleitet. Login mit deinem Account. Zurück zur App siehst du eine leere Liste + „+ Neu" Button.
+**Basis-Template:** Health-Page mit Solution-Name + Status „Backend API: ok".
+Die API läuft ohne Login — Template-Default ist `DISABLE_AUTH=1` (Fail-Open,
+bewusst für lokale Tests; für Produktion: `0` + SSO, siehe JOURNEY.md Phase 5).
+
+**List-UI** (falls in Schritt 4 `add-resource` genutzt):
+
+```bash
+open http://localhost:7100/tasks
+```
 
 **Was prüfen:**
-- [ ] Login redirected korrekt
-- [ ] Nach Login bist du zurück auf der App
-- [ ] Header zeigt deinen Namen
-- [ ] „Neu" öffnet ein Form
-- [ ] Submit erstellt einen Eintrag → erscheint in der Liste
+- [ ] Health-Page: „Backend API: ok" (grün)
+- [ ] `/tasks`: List-Page rendert, Einträge aus der DB sichtbar
+- [ ] Neue Resource per API: `curl -X POST http://localhost:7101/api/v1/tasks -H 'Content-Type: application/json' -d '{"title":"Test"}'` → erscheint in der Liste
+- [ ] Swagger: `open http://localhost:7101/docs` zeigt alle Routen
 
 ### Backend testen
 
@@ -189,25 +202,25 @@ docker exec -it ${TEST_SLUG}-postgres psql -U <user> <db>
 
 ---
 
-## Schritt 6: Code-Qualität prüfen *(2 min)*
-
-opencode sollte clean Code generiert haben. Verifizieren:
+## Schritt 6: Solution inspizieren *(1 min)*
 
 ```bash
-cd ~/.clever/solutions/$TEST_SLUG
-
-# Frontend Lint
-make frontend-lint
-
-# Backend Lint + Type
-make backend-lint
-make backend-typecheck
-
-# Tests laufen
-make backend-test
+clever inspect $TEST_SLUG
 ```
 
-Alles sollte grün sein. Falls nicht: das ist ein **Feedback an die Guides** - sag mir welche Konvention nicht eingehalten wurde, dann schärfen wir die Guides.
+Zeigt strukturiert: Ports, Models, Router, Migrations, Frontend-Pages,
+Container-Status und die letzten Backend-Errors. Alles sollte passen:
+Container `Up`, Migrations 001 (plus eine pro `add-resource`), keine Errors.
+
+Zusätzlich Smoke-Test der API:
+
+```bash
+curl -fsS http://localhost:7101/health        # {"status":"ok",...}
+curl -fsS http://localhost:7101/api/v1/items  # []
+```
+
+Falls irgendetwas nicht grün ist: das ist ein **Feedback an die Toolchain** —
+`clever-code`-Repo (nicht `~/.clever/`), siehe `DEVELOPING.md` (isolierter Dev-Loop).
 
 ---
 
@@ -239,16 +252,15 @@ docker compose down -v
 cd ~ && rm -rf ~/.clever/solutions/$TEST_SLUG
 
 # 3. Keycloak Client löschen (über UI oder API)
-# https://id.clevercompany.ai/admin → Realm clevercompany → Clients
+# https://id.clevercompany.ai/admin → Realm solutions → Clients
 # → solution-<SLUG> → Delete
 
-# Oder per API (Token muss frisch sein):
-clever auth
-TOKEN=$(cat ~/.clever/admin-token)
+# Oder per API (Auto-Refresh holt sich ein frisches Token):
+TOKEN=$(bash ~/.clever/scripts/keycloak-client.sh token)
 CID="solution-$TEST_SLUG"
-UUID=$(curl -fsS "https://id.clevercompany.ai/admin/realms/clevercompany/clients?clientId=$CID" \
+UUID=$(curl -fsS "https://id.clevercompany.ai/admin/realms/solutions/clients?clientId=$CID" \
   -H "Authorization: Bearer $TOKEN" | python3 -c "import sys,json;print(json.load(sys.stdin)[0]['id'])")
-curl -fsS -X DELETE "https://id.clevercompany.ai/admin/realms/clevercompany/clients/$UUID" \
+curl -fsS -X DELETE "https://id.clevercompany.ai/admin/realms/solutions/clients/$UUID" \
   -H "Authorization: Bearer $TOKEN"
 echo "✓ Keycloak Client weg"
 ```
@@ -262,11 +274,14 @@ Nach Schritt 8 hast du verifiziert:
 - ✅ Installer pullt Files via Gateway korrekt
 - ✅ `clever` CLI mit Help, Auth, Check
 - ✅ Slug-Verfügbarkeits-Check erkennt belegte/freie/ungültige Slugs
-- ✅ opencode liest die Guides und generiert eine vollständige Solution
+- ✅ Deterministisches Scaffold (31 Template-Dateien, ohne LLM)
+- ✅ Generatoren: `add-resource` (Model + API + Page + Migration), `add-page`
 - ✅ Auto-Setup von Keycloak-Client (Redirect URIs, Group)
-- ✅ Lokaler Stack läuft (Frontend + Backend + DB)
-- ✅ Login-Flow über `id.clevercompany.ai` funktioniert
+- ✅ Lokaler Stack läuft (Frontend + Backend + DB, Health-Wait fehlert sichtbar)
 - ✅ User-Invite via Group-Membership
+
+> Hinweis: Der Keycloak-Login-Flow (SSO) ist im Basis-Template noch nicht enthalten
+> (`DISABLE_AUTH=1`). Für „privat online" siehe JOURNEY.md Phase 5.
 
 ---
 

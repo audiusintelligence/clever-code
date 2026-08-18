@@ -1,5 +1,8 @@
 async function getHealth() {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://backend:8000';
+  // SERVER-seitiger Fetch: NEXT_PUBLIC_API_URL ist build-time geinlined
+  // (http://localhost:<port> - fuer den Browser) und inside Container falsch.
+  // Intern immer via Compose-DNS: http://backend:8000
+  const apiUrl = process.env.INTERNAL_API_URL || 'http://backend:8000';
   try {
     const res = await fetch(`${apiUrl}/health`, { cache: 'no-store' });
     return res.ok ? 'ok' : 'down';

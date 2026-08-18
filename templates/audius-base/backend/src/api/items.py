@@ -5,7 +5,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import DateTime, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -17,7 +17,9 @@ class Item(Base):
     __tablename__ = "items"
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     title: Mapped[str]
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC))
+    # DateTime(timezone=True) muss EXPLIZIT stehen: Mapped[datetime] inferiert naive
+    # DateTime, waehrend die Migration timestamptz erzeugt -> sonst asyncpg DataError.
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 
 
 class ItemCreate(BaseModel):

@@ -231,7 +231,13 @@ print(json.dumps({
       | python3 -c "
 import sys,json
 for c in json.load(sys.stdin):
-    print(f\"  {c['clientId']:40s} {c.get('description','')}\")"
+    print(f\"  {c['clientId']:40s} {c.get('description', '')}\")"
+    ;;
+
+  token)
+    # Gueltiges Token ausgeben (Auto-Refresh) - fuer andere Skripte (z.B. check-slug.sh),
+    # die NICHT selbst das rohe admin-token-File lesen sollen (Access-TTL ~5 min).
+    token
     ;;
 
   *)
@@ -240,8 +246,10 @@ Usage: $0 <command>
 
   auth                          Admin Login (einmalig pro 5 min)
   create <name> [desc] [port]   Keycloak Client + Group anlegen
-  invite <name> <email>         User für Solution freischalten
+  invite <name> [email]         User für Solution freischalten
   list                          alle eigenen Solutions in Keycloak
+  token                         gültiges Token ausgeben (Auto-Refresh)
 EOF
+    exit 1
     ;;
 esac

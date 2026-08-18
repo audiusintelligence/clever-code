@@ -46,6 +46,8 @@ services:
     restart: unless-stopped
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:${PORT_BACKEND:-8000}
+      # fuer SERVER-seitige Fetches (Server Components): Compose-DNS, nicht localhost
+      INTERNAL_API_URL: http://backend:8000
     ports:
       - "127.0.0.1:${PORT_FRONTEND:-3000}:3000"
     depends_on:

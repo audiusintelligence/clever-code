@@ -38,6 +38,15 @@ NAME_KEBAB=$(echo "$NAME_SNAKE" | tr '_' '-')
 
 cd "$SOLDIR"
 
+# Idempotenz-Guard: Re-Run mit gleichem Namen wuerde Dateien still ueberschreiben und
+# eine DOPPELTE Migration erzeugen (create_table existiert schon -> naechster Upgrade
+# crasht). Abbruch mit klarer Meldung statt stiller Korruption.
+if [[ -f "backend/src/models/${NAME_SNAKE}.py" ]]; then
+  echo "✗ Resource '${NAME_PASCAL}' existiert bereits (backend/src/models/${NAME_SNAKE}.py)."
+  echo "  Aenderungen: opencode extend ${SLUG} \"...\"  oder die Dateien direkt anpassen."
+  exit 1
+fi
+
 GREEN=$'\033[0;32m'; NC=$'\033[0m'
 ok() { echo "${GREEN}✓${NC} $1"; }
 
@@ -51,7 +60,7 @@ field_to_py() {
     int)      echo "Mapped[int]" ;;
     float)    echo "Mapped[float]" ;;
     bool)     echo "Mapped[bool] = mapped_column(default=False)" ;;
-    datetime) echo "Mapped[datetime]" ;;
+    datetime) echo "Mapped[datetime] = mapped_column(DateTime(timezone=True))" ;;
     uuid)     echo "Mapped[UUID]" ;;
     *)        echo "Mapped[str]" ;;
   esac
@@ -95,6 +104,7 @@ done
 cat > "backend/src/models/${NAME_SNAKE}.py" <<EOF
 from datetime import datetime, UTC
 from uuid import UUID, uuid4
+from sqlalchemy import DateTime
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.core.db import Base
@@ -104,7 +114,7 @@ class ${NAME_PASCAL}(Base):
     __tablename__ = "${NAME_PLURAL}"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
-${MODEL_FIELDS}    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC))
+${MODEL_FIELDS}    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC))
 EOF
 ok "Model: backend/src/models/${NAME_SNAKE}.py"
 
@@ -310,7 +320,9 @@ done
 
 cat > "frontend/src/app/${NAME_PLURAL}/page.tsx" <<EOF
 async function getItems() {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://backend:8000';
+  // SERVER-seitiger Fetch: INTERNAL_API_URL (Compose-DNS), nicht NEXT_PUBLIC_API_URL
+  // (build-time geinlined = http://localhost:<port> - im Container falsch).
+  const apiUrl = process.env.INTERNAL_API_URL || 'http://backend:8000';
   try {
     const res = await fetch(\`\${apiUrl}/api/v1/${NAME_PLURAL}\`, { cache: 'no-store' });
     return res.ok ? await res.json() : [];

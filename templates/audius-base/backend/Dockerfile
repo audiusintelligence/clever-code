@@ -1,5 +1,8 @@
 FROM python:3.12-slim
 WORKDIR /app
+# Damit CLI-Tools (alembic) 'src' importieren koennen - uvicorn fuellt CWD selbst in
+# sys.path, die Alembic-Console-Scripte aber nicht (sonst: No module named 'src').
+ENV PYTHONPATH=/app
 
 RUN apt-get update && apt-get install -y --no-install-recommends gcc libpq-dev && rm -rf /var/lib/apt/lists/*
 
